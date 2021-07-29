@@ -30,6 +30,7 @@ github_username: yulinfeng000
 
 # pagination
 paginate: 5
+paginate_path: "/:num"
 
 highlighter: rouge
 gist:
