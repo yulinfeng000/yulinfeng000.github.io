@@ -1,0 +1,205 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    
+<meta charset="utf-8" >
+
+<title>Setup Wireguard with Surge | Cam</title>
+<meta name="description" content="living for inspire">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.0/animate.min.css">
+
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+<link rel="shortcut icon" href="https://yulinfeng000.github.io/favicon.ico?v=1664112556753">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css">
+<link rel="stylesheet" href="https://yulinfeng000.github.io/styles/main.css">
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.5.1/build/highlight.min.js"></script>
+
+
+
+  </head>
+  <body>
+    <div id="app" class="main">
+      <div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://yulinfeng000.github.io">
+        <img class="avatar" src="https://yulinfeng000.github.io/images/avatar.png?v=1664112556753" alt="" width="32px" height="32px">
+      </a>
+      <a href="https://yulinfeng000.github.io">
+        <h1 class="site-title">Cam</h1>
+      </a>
+    </div>
+    <div class="right">
+      <transition name="fade">
+        <i class="icon" :class="{ 'icon-close-outline': menuVisible, 'icon-menu-outline': !menuVisible }" @click="menuVisible = !menuVisible"></i>
+      </transition>
+    </div>
+  </div>
+</div>
+
+<transition name="fade">
+  <div class="menu-container" style="display: none;" v-show="menuVisible">
+    <div class="menu-list">
+      
+        
+          <a href="/" class="menu purple-link">
+            Home
+          </a>
+        
+      
+        
+          <a href="/archives" class="menu purple-link">
+            Archives
+          </a>
+        
+      
+        
+          <a href="/tags" class="menu purple-link">
+            Tags
+          </a>
+        
+      
+        
+          <a href="/post/about" class="menu purple-link">
+            About
+          </a>
+        
+      
+    </div>
+  </div>
+</transition>
+
+
+      <div class="content-container">
+        <div class="post-detail">
+          
+          <h2 class="post-title">Setup Wireguard with Surge</h2>
+          <div class="post-info post-detail-info">
+            <span><i class="icon-calendar-outline"></i> 2022-09-25</span>
+            
+              <span>
+                <i class="icon-pricetags-outline"></i>
+                
+                  <a href="https://yulinfeng000.github.io/tag/wXkTrE940/">
+                    Surge
+                    
+                  </a>
+                
+              </span>
+            
+          </div>
+          <div class="post-content" v-pre>
+            <h2 id="intro">Intro</h2>
+<p>Company deploys a WireGuard server to access the internal network and pc since covid-19. I download the WireGuard app from APP Store but it's a VPN, so something<br>
+'magic' could not happen like surge~. Fortunately, Surge Mac declared them support wiregaurd since Surge Mac 4.4.0. so I migrated my VPN from WireGuard APP to Surge implemented.</p>
+<p>I copy the wireguard config and paste in my surge config with the format but it's not work. Then I read the manual of Surge, figure out what's different between original config and surge's wireguard config and what's reason make them different.</p>
+<h2 id="edited-configs">Edited Configs</h2>
+<p>The origin config that company given as follows:</p>
+<pre><code class="language-ini">[Interface]
+PrivateKey = &lt;PrivateKey&gt;
+Address = 10.8.0.7/24
+DNS = 8.8.8.8
+MTU = 1420
+
+[Peer]
+PublicKey = &lt;PublicKey&gt;
+PresharedKey = &lt;PresharedKey&gt;
+AllowedIPs = 10.8.0.0/24  # &lt;&lt;&lt;&lt;&lt; the diff
+Endpoint = &lt;Endpoint&gt;
+PersistentKeepalive = 0
+</code></pre>
+<p>And my edited config for surge as follows:</p>
+<pre><code class="language-ini">[General]
+tun-included-routes = 10.8.0.0/24 # by `allowed-ips` from original wireguard config
+
+[WireGuard wg]
+private-key = &lt;PublicKey&gt;
+self-ip = 10.8.0.7
+dns-server = 8.8.8.8
+mtu = 1420
+peer = (
+    public-key = &lt;PublicKey&gt;, 
+    allowed-ips = 0.0.0.0/0,  # &lt;&lt;&lt;&lt;&lt; the diff
+    endpoint = &lt;Endpoint&gt;, 
+    preshared-key = &lt;PresharedKey&gt;
+)
+
+[Proxy Group]
+VPN = select, wg
+
+[Rule]
+IP-CIDR,10.8.0.0/24,VPN # by `allowed-ips` from original wireguard config
+</code></pre>
+<h2 id="the-reason-with-my-guess">The Reason with my Guess</h2>
+<p><code>allowed-ips</code> in Surge config has changed to 0.0.0.0/0, and I add <code>tun-included-routers</code> and an <code>IP-CIDR Rule</code>, and I figure out the company's given config is wrong (from security perspectives it's right but not convenient).<br>
+The allowed-ips defined in WireGuard is &quot;Any packet from the given peer with a source IP address which is not listed in AllowedIPs will be discarded!&quot;</p>
+<p>The structure of wireguard app and Surge implements may like this:</p>
+<p>WireGuard APP</p>
+<pre><code>packets -&gt; wireguard local network interface -&gt; wireguard server
+</code></pre>
+<p>Surge Implements</p>
+<pre><code>packets -&gt; surge tun router -&gt; surge's wireguard module -&gt; wireguard server
+</code></pre>
+<p>In WireGuard APP, we will have a network interface like tun01, Which will have an IP address that self-ip's given, but in Surge tun mode (enhanced mode), Surge only uses the encrypt proxy method but not the full stack of wireguard. So we have to add some additional rules to simulate a full stack wireguard.</p>
+
+          </div>
+        </div>
+
+        
+          <div class="next-post">
+            <a class="purple-link" href="https://yulinfeng000.github.io/post/instance-detection-rotated-box/">
+              <h3 class="post-title">
+                下一篇：Instance Detection: Rotated Box
+              </h3>
+            </a>
+          </div>
+          
+      </div>
+
+      
+
+      <div class="site-footer">
+  <div class="slogan">living for inspire</div>
+  <div class="social-container">
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+  </div>
+  Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a> | Host on <a href="https://pages.github.com/"> Github Page </a> | <a class="rss" href="https://yulinfeng000.github.io/atom.xml" target="_blank">RSS</a>
+</div>
+
+
+    </div>
+    <script type="application/javascript">
+
+hljs.initHighlightingOnLoad()
+
+var app = new Vue({
+  el: '#app',
+  data: {
+    menuVisible: false,
+  },
+})
+
+</script>
+
+
+
+
+  </body>
+</html>

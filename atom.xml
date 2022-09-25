@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <id>https://yulinfeng000.github.io</id>
+    <title>Cam</title>
+    <updated>2022-09-25T13:29:18.691Z</updated>
+    <generator>https://github.com/jpmonette/feed</generator>
+    <link rel="alternate" href="https://yulinfeng000.github.io"/>
+    <link rel="self" href="https://yulinfeng000.github.io/atom.xml"/>
+    <subtitle>living for inspire</subtitle>
+    <logo>https://yulinfeng000.github.io/images/avatar.png</logo>
+    <icon>https://yulinfeng000.github.io/favicon.ico</icon>
+    <rights>All rights reserved 2022, Cam</rights>
+    <entry>
+        <title type="html"><![CDATA[Setup Wireguard with Surge]]></title>
+        <id>https://yulinfeng000.github.io/post/setup-wireguard-with-surge/</id>
+        <link href="https://yulinfeng000.github.io/post/setup-wireguard-with-surge/">
+        </link>
+        <updated>2022-09-25T05:11:33.000Z</updated>
+        <content type="html"><![CDATA[<h2 id="intro">Intro</h2>
+<p>Company deploys a WireGuard server to access the internal network and pc since covid-19. I download the WireGuard app from APP Store but it's a VPN, so something<br>
+'magic' could not happen like surge~. Fortunately, Surge Mac declared them support wiregaurd since Surge Mac 4.4.0. so I migrated my VPN from WireGuard APP to Surge implemented.</p>
+<p>I copy the wireguard config and paste in my surge config with the format but it's not work. Then I read the manual of Surge, figure out what's different between original config and surge's wireguard config and what's reason make them different.</p>
+<h2 id="edited-configs">Edited Configs</h2>
+<p>The origin config that company given as follows:</p>
+<pre><code class="language-ini">[Interface]
+PrivateKey = &lt;PrivateKey&gt;
+Address = 10.8.0.7/24
+DNS = 8.8.8.8
+MTU = 1420
+
+[Peer]
+PublicKey = &lt;PublicKey&gt;
+PresharedKey = &lt;PresharedKey&gt;
+AllowedIPs = 10.8.0.0/24  # &lt;&lt;&lt;&lt;&lt; the diff
+Endpoint = &lt;Endpoint&gt;
+PersistentKeepalive = 0
+</code></pre>
+<p>And my edited config for surge as follows:</p>
+<pre><code class="language-ini">[General]
+tun-included-routes = 10.8.0.0/24 # by `allowed-ips` from original wireguard config
+
+[WireGuard wg]
+private-key = &lt;PublicKey&gt;
+self-ip = 10.8.0.7
+dns-server = 8.8.8.8
+mtu = 1420
+peer = (
+    public-key = &lt;PublicKey&gt;, 
+    allowed-ips = 0.0.0.0/0,  # &lt;&lt;&lt;&lt;&lt; the diff
+    endpoint = &lt;Endpoint&gt;, 
+    preshared-key = &lt;PresharedKey&gt;
+)
+
+[Proxy Group]
+VPN = select, wg
+
+[Rule]
+IP-CIDR,10.8.0.0/24,VPN # by `allowed-ips` from original wireguard config
+</code></pre>
+<h2 id="the-reason-with-my-guess">The Reason with my Guess</h2>
+<p><code>allowed-ips</code> in Surge config has changed to 0.0.0.0/0, and I add <code>tun-included-routers</code> and an <code>IP-CIDR Rule</code>, and I figure out the company's given config is wrong (from security perspectives it's right but not convenient).<br>
+The allowed-ips defined in WireGuard is &quot;Any packet from the given peer with a source IP address which is not listed in AllowedIPs will be discarded!&quot;</p>
+<p>The structure of wireguard app and Surge implements may like this:</p>
+<p>WireGuard APP</p>
+<pre><code>packets -&gt; wireguard local network interface -&gt; wireguard server
+</code></pre>
+<p>Surge Implements</p>
+<pre><code>packets -&gt; surge tun router -&gt; surge's wireguard module -&gt; wireguard server
+</code></pre>
+<p>In WireGuard APP, we will have a network interface like tun01, Which will have an IP address that self-ip's given, but in Surge tun mode (enhanced mode), Surge only uses the encrypt proxy method but not the full stack of wireguard. So we have to add some additional rules to simulate a full stack wireguard.</p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[Instance Detection: Rotated Box]]></title>
+        <id>https://yulinfeng000.github.io/post/instance-detection-rotated-box/</id>
+        <link href="https://yulinfeng000.github.io/post/instance-detection-rotated-box/">
+        </link>
+        <updated>2022-09-19T03:53:23.000Z</updated>
+        <content type="html"><![CDATA[<ul>
+<li>How to represent a rotated box?</li>
+<li>How to make a COCO dataset with the rotated box?</li>
+<li>How about next?</li>
+</ul>
+<h2 id="how-to-represent-a-rotated-box">How to represent a rotated box?</h2>
+<p>As Detectron2 and mmdetection implemented, both choose <code>cx,cy,w,h,angle</code> to represent a box with rotated angle.</p>
+<p>'cx' means the box's center point's mapping on the x-axis.<br>
+'cy' means the box's center point's mapping on the y-axis.<br>
+w means the box's width.<br>
+h means the box's height.<br>
+angle means the rotated angle.</p>
+<p>And then, the question is as follows:</p>
+<blockquote>
+<p>What's the angle's rotated direction and rotated by which edge?</p>
+</blockquote>
+<p>There are two directions to rotate the box, CW and CCW. And there is another post that introduces the theory of rotated boxes. <a href="https://zhuanlan.zhihu.com/p/459018810">关于旋转框定义的一些理解和感想</a>.</p>
+<p>The choice of direction is decided by which method we generate the rotated box representation. In advance, we choose OpenCV's minAreaRect function to generate rotated boxes; it uses CW representation (opencv-python&gt;=4.5.1 changed minAreaRect's angle direction from CCW to CW) and rotated by w edge, so the default rotated direction in this post is CW by width edge!</p>
+<h2 id="how-to-make-a-coco-dataset-with-rotated-box">How to make a COCO dataset with rotated box?</h2>
+<p>Here has two solution to get over it</p>
+<ul>
+<li>Do rotate transform on getting batch of data.</li>
+<li>Make a dataset with rotate box.</li>
+</ul>
+<ol>
+<li>Do Rotate Transform</li>
+</ol>
+<pre><code class="language-python">import numpy as np
+import cv2
+import torch
+from torchvision.datasets.coco import CocoDetection
+
+def mask2rotated_box(mask:np.ndarray):
+    &quot;&quot;&quot;
+    Args:
+        mask: [numpy.ndarry] binary mask
+        
+    Returns:
+        rotated box : [center_x,center_y,w,h,theta]
+        area        : box area
+    &quot;&quot;&quot;
+
+    contours = cv2.findContours(mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)
+    contours = contours[0] if len(contours) == 2 else contours[1]
+		
+    contours = np.vstack(contours).squeeze()
+    rect = cv2.minAreaRect(contours)
+    (cx,cy),(w,h),theta = rect
+    area = w * h
+    return [cx,cy,w,h,theta],area
+
+
+class ToRotatedCoCoDataset(CocoDetection):
+
+    def __getitem__(self, index: int):
+        img, annotations = super().__getitem__(index)
+        target = {
+            &quot;gt_boxes&quot;: [],
+            &quot;gt_masks&quot;: [],
+            &quot;gt_labels&quot;: [],
+            &quot;areas&quot;: [],
+            &quot;image_id&quot;: annotations[0][&quot;image_id&quot;],
+            &quot;is_crowed&quot;: torch.zeros(len(annotations), dtype=torch.int32),
+        }
+
+        # do rotate transform
+        for ann in annotations:
+            mask = self.coco.annToMask(ann)
+            r_bbox, area = mask2rotated_box(mask)
+            target[&quot;gt_labels&quot;].append(ann[&quot;category_id&quot;])
+            target[&quot;gt_masks&quot;].append(mask)
+            target[&quot;gt_boxes&quot;].append(r_bbox)
+            target[&quot;areas&quot;].append(area)
+
+        # tensorization (optional)
+        target[&quot;areas&quot;] = torch.tensor(target[&quot;areas&quot;], dtype=torch.float32)
+        target[&quot;gt_boxes&quot;] = torch.tensor(target[&quot;boxes&quot;], dtype=torch.float32)
+        target[&quot;gt_masks&quot;] = torch.from_numpy(np.stack(target[&quot;masks&quot;], axis=0))
+        target[&quot;gt_labels&quot;] = torch.tensor(target[&quot;labels&quot;], dtype=torch.float32)
+
+        return img, target
+</code></pre>
+<ol start="2">
+<li>Make a Rotate COCO Dataset<br>
+There is a python library called <a href="https://github.com/waspinator/pycococreator">pycococreator</a>, could generate coco annotaion json data. here is a rotated alternative for <code>pycococreatortools.create_annotation_info</code> function.</li>
+</ol>
+<pre><code class="language-python">from pycococreatortools import (
+    create_image_info,
+    resize_binary_mask,
+    binary_mask_to_polygon,
+    binary_mask_to_rle,
+    mask as maskutils,
+)
+
+def create_rotated_annotation_info(
+    annotation_id,
+    image_id,
+    category_info,
+    binary_mask,
+    image_size=None,
+    tolerance=2,
+    bounding_box=None,
+):
+
+    if image_size is not None:
+        binary_mask = resize_binary_mask(binary_mask, image_size)
+
+    binary_mask_encoded = maskutils.encode(
+        np.asfortranarray(binary_mask.astype(np.uint8))
+    )
+
+    area = maskutils.area(binary_mask_encoded)
+    if area &lt; 1:
+        return None
+
+    if bounding_box is None:
+        bounding_box,area = mask2rotated_box(binary_mask) # maskutils.toBbox(binary_mask_encoded)
+
+    if category_info[&quot;is_crowd&quot;]:
+        is_crowd = 1
+        segmentation = binary_mask_to_rle(binary_mask)
+    else:
+        is_crowd = 0
+        segmentation = binary_mask_to_polygon(binary_mask, tolerance)
+        if not segmentation:
+            return None
+
+    annotation_info = {
+        &quot;id&quot;: annotation_id,
+        &quot;image_id&quot;: image_id,
+        &quot;category_id&quot;: category_info[&quot;id&quot;],
+        &quot;iscrowd&quot;: is_crowd,
+        &quot;area&quot;: area,
+        &quot;bbox&quot;: bounding_box,
+        &quot;segmentation&quot;: segmentation,
+        &quot;width&quot;: binary_mask.shape[1],
+        &quot;height&quot;: binary_mask.shape[0],
+    }
+
+    return annotation_info
+</code></pre>
+<h2 id="how-about-next">How about next?</h2>
+<p>Now we could get a COCO dataset with the rotated box, could implement rotated_faster_rcnn and even rotated_mask_rcnn</p>
+]]></content>
+    </entry>
+</feed>
